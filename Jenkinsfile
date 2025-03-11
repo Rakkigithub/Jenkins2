@@ -6,7 +6,7 @@ pipeline {
     
     stages {
         stage('Clone') {
-            steps { git 'https://github.com/user/repo.git' }
+            steps { git 'https://github.com/Rakkigithub/Jenkins2.git' }
         }
 
         stage('Build Docker Image') {
