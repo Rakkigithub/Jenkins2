@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent any  // ✅ Use 'any' instead of 'docker'
 
     parameters {
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
@@ -7,7 +7,30 @@ pipeline {
         booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: false, description: 'Check to destroy Terraform resources')
     }
 
+    environment {
+        TERRAFORM_BIN = '/usr/bin/terraform'  // ✅ Specify Terraform path
+    }
+
     stages {
+        stage('Install Terraform (if missing)') {
+            steps {
+                script {
+                    def terraformExists = sh(script: 'command -v terraform', returnStatus: true) == 0
+                    if (!terraformExists) {
+                        sh '''
+                        echo "Terraform not found! Installing..."
+                        wget -q -O terraform.zip https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
+                        unzip terraform.zip
+                        sudo mv terraform /usr/local/bin/
+                        terraform version
+                        '''
+                    } else {
+                        sh 'terraform version'
+                    }
+                }
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                 deleteDir()
@@ -16,23 +39,10 @@ pipeline {
             }
         }
 
-        stage('Check Terraform Version') {
-            steps {
-                sh 'docker run --rm hashicorp/terraform:1.6.0 version'  // ✅ Run Terraform in Docker
-            }
-        }
-
         stage('Terraform Init') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 init -input=false
-                    '''
+                    sh 'terraform init -input=false main.tf'
                 }
             }
         }
@@ -41,14 +51,7 @@ pipeline {
             when { expression { params.PLAN_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 plan -input=false -out=tfplan main.tf
-                    '''
+                    sh 'terraform plan -input=false -out=tfplan main.tf'
                 }
             }
         }
@@ -57,14 +60,7 @@ pipeline {
             when { expression { params.APPLY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 apply -auto-approve tfplan
-                    '''
+                    sh 'terraform apply -auto-approve tfplan'
                 }
             }
         }
@@ -73,14 +69,7 @@ pipeline {
             when { expression { params.DESTROY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 destroy -auto-approve main.tf
-                    '''
+                    sh 'terraform destroy -auto-approve main.tf'
                 }
             }
         }
