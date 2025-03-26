@@ -1,5 +1,5 @@
 pipeline {
-    agent any  
+    agent any
 
     parameters {
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
@@ -7,68 +7,72 @@ pipeline {
         booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: false, description: 'Check to destroy Terraform resources')
     }
 
-    environment {
-        TERRAFORM_BIN = '/usr/local/bin/terraform'  // ✅ Use the variable consistently
-    }
-
     stages {
-        stage('Install Terraform (if missing)') {
-            steps {
-                script {
-                    def terraformExists = sh(script: 'command -v terraform', returnStatus: true) == 0
-                    if (!terraformExists) {
-                        sh '''
-                        echo "Terraform not found! Installing..."
-                        wget -q -O terraform.zip https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
-                        unzip terraform.zip
-                        sudo mv terraform /usr/local/bin/
-                        rm -f terraform.zip
-                        '''
-                    }
-                    sh '$TERRAFORM_BIN version'
-                }
-            }
-        }
 
         stage('Clone Repository') {
             steps {
                 deleteDir()
-                git branch: 'main', url: 'https://github.com/Rakkigithub/Jenkins2.git'
+                git branch: 'main',
+                    url: 'https://github.com/Rakkigithub/Jenkins2.git'   // ✅ Your GitHub repo
                 sh "ls -lart"
+            }
+        }
+
+        stage('Check Terraform Version') {
+            steps {
+                sh 'terraform version'
             }
         }
 
         stage('Terraform Init') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '$TERRAFORM_BIN init -input=false'
+                    dir('infra') {
+                        sh 'echo "=================Terraform Init=================="'
+                        sh 'terraform init'
+                    }
                 }
             }
         }
 
         stage('Terraform Plan') {
-            when { expression { params.PLAN_TERRAFORM } }
+            when {
+                expression { params.PLAN_TERRAFORM }
+            }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '$TERRAFORM_BIN plan -input=false -out=tfplan'
+                    dir('infra') {
+                        sh 'echo "=================Terraform Plan=================="'
+                        sh 'terraform plan'
+                    }
                 }
             }
         }
 
         stage('Terraform Apply') {
-            when { expression { params.APPLY_TERRAFORM } }
+            when {
+                expression { params.APPLY_TERRAFORM }
+            }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '$TERRAFORM_BIN apply -auto-approve tfplan'
+                    dir('infra') {
+                        sh 'echo "=================Terraform Apply=================="'
+                        sh 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
 
         stage('Terraform Destroy') {
-            when { expression { params.DESTROY_TERRAFORM } }
+            when {
+                expression { params.DESTROY_TERRAFORM }
+            }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '$TERRAFORM_BIN destroy -auto-approve'
+                    dir('infra') {
+                        sh 'echo "=================Terraform Destroy=================="'
+                        sh 'terraform destroy -auto-approve'
+                    }
                 }
             }
         }
