@@ -1,5 +1,9 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'hashicorp/terraform:1.6.0'  // ✅ Use Terraform Docker image
+        }
+    }
 
     parameters {
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
@@ -8,71 +12,52 @@ pipeline {
     }
 
     stages {
-
         stage('Clone Repository') {
             steps {
                 deleteDir()
                 git branch: 'main',
-                    url: 'https://github.com/rahulwagh/devops-project-1.git'
+                    url: 'https://github.com/Rakkigithub/Jenkins2.git'
                 sh "ls -lart"
             }
         }
 
-        stage('Check Terraform Version') {
+        stage('Terraform Version') {
             steps {
-                sh 'terraform version'
+                sh 'terraform version'  // ✅ Verify Terraform version
             }
         }
 
         stage('Terraform Init') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Init=================="'
-                        sh 'terraform init'
-                    }
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
+                    sh 'terraform init -input=false'
                 }
             }
         }
 
         stage('Terraform Plan') {
-            when {
-                expression { params.PLAN_TERRAFORM }
-            }
+            when { expression { params.PLAN_TERRAFORM } }
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Plan=================="'
-                        sh 'terraform plan'
-                    }
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
+                    sh 'terraform plan -input=false -out=tfplan main.tf'
                 }
             }
         }
 
         stage('Terraform Apply') {
-            when {
-                expression { params.APPLY_TERRAFORM }
-            }
+            when { expression { params.APPLY_TERRAFORM } }
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Apply=================="'
-                        sh 'terraform apply -auto-approve'
-                    }
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
+                    sh 'terraform apply -auto-approve tfplan'
                 }
             }
         }
 
         stage('Terraform Destroy') {
-            when {
-                expression { params.DESTROY_TERRAFORM }
-            }
+            when { expression { params.DESTROY_TERRAFORM } }
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Destroy=================="'
-                        sh 'terraform destroy -auto-approve'
-                    }
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
+                    sh 'terraform destroy -auto-approve main.tf'
                 }
             }
         }
