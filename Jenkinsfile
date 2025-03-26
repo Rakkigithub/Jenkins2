@@ -8,79 +8,71 @@ pipeline {
     }
 
     stages {
+
         stage('Clone Repository') {
             steps {
                 deleteDir()
-                git branch: 'main', url: 'https://github.com/Rakkigithub/Jenkins2.git'
+                git branch: 'main',
+                    url: 'https://github.com/Rakkigithub/Jenkins2.git'   // ✅ Your GitHub repo
                 sh "ls -lart"
             }
         }
 
         stage('Check Terraform Version') {
             steps {
-                sh 'docker run --rm hashicorp/terraform:1.6.0 version'  // ✅ Run Terraform in Docker
+                sh 'terraform version'
             }
         }
 
         stage('Terraform Init') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 init -input=false
-                    '''
+                    dir('infra') {
+                        sh 'echo "=================Terraform Init=================="'
+                        sh 'terraform init'
+                    }
                 }
             }
         }
 
         stage('Terraform Plan') {
-            when { expression { params.PLAN_TERRAFORM } }
+            when {
+                expression { params.PLAN_TERRAFORM }
+            }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 plan -input=false -out=tfplan main.tf
-                    '''
+                    dir('infra') {
+                        sh 'echo "=================Terraform Plan=================="'
+                        sh 'terraform plan'
+                    }
                 }
             }
         }
 
         stage('Terraform Apply') {
-            when { expression { params.APPLY_TERRAFORM } }
+            when {
+                expression { params.APPLY_TERRAFORM }
+            }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 apply -auto-approve tfplan
-                    '''
+                    dir('infra') {
+                        sh 'echo "=================Terraform Apply=================="'
+                        sh 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
 
         stage('Terraform Destroy') {
-            when { expression { params.DESTROY_TERRAFORM } }
+            when {
+                expression { params.DESTROY_TERRAFORM }
+            }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh '''
-                    docker run --rm \
-                    -v $PWD:/workspace \
-                    -w /workspace \
-                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                    hashicorp/terraform:1.6.0 destroy -auto-approve main.tf
-                    '''
+                    dir('infra') {
+                        sh 'echo "=================Terraform Destroy=================="'
+                        sh 'terraform destroy -auto-approve'
+                    }
                 }
             }
         }
