@@ -1,88 +1,167 @@
-/*module "s3" {
-  source      = "./s3"
-  bucket_name = var.bucket_name
-  name        = var.name
-  environment = var.bucket_name
-}*/
-
-module "networking" {
-  source               = "./networking"
-  vpc_cidr             = var.vpc_cidr
-  vpc_name             = var.vpc_name
-  cidr_public_subnet   = var.cidr_public_subnet
-  eu_availability_zone = var.eu_availability_zone
-  cidr_private_subnet  = var.cidr_private_subnet
+provider "aws" {
+  region = "us-east-1" # Change to your preferred region
 }
 
-module "security_group" {
-  source                     = "./security-groups"
-  ec2_sg_name                = "SG for EC2 to enable SSH(22) and HTTP(80)"
-  vpc_id                     = module.networking.dev_proj_1_vpc_id
-  public_subnet_cidr_block   = tolist(module.networking.public_subnet_cidr_block)
-  ec2_sg_name_for_python_api = "SG for EC2 for enabling port 5000"
+# Create VPC
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  tags                 = { Name = "Prod-VPC" }
 }
 
-module "ec2" {
-  source                   = "./ec2"
-  ami_id                   = var.ec2_ami_id
-  instance_type            = "t2.micro"
-  tag_name                 = "Ubuntu Linux EC2"
-  public_key               = var.public_key
-  subnet_id                = tolist(module.networking.dev_proj_1_public_subnets)[0]
-  sg_enable_ssh_https      = module.security_group.sg_ec2_sg_ssh_http_id
-  ec2_sg_name_for_python_api     = module.security_group.sg_ec2_for_python_api
-  enable_public_ip_address = true
-  user_data_install_apache = templatefile("./template/ec2_install_apache.sh", {})
+# Create Public Subnet
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+  availability_zone       = "us-east-1a"
+  tags                    = { Name = "PublicSubnet" }
 }
 
-module "lb_target_group" {
-  source                   = "./load-balancer-target-group"
-  lb_target_group_name     = "dev-proj-1-lb-target-group"
-  lb_target_group_port     = 5000
-  lb_target_group_protocol = "HTTP"
-  vpc_id                   = module.networking.dev_proj_1_vpc_id
-  ec2_instance_id          = module.ec2.dev_proj_1_ec2_instance_id
+# Create Private Subnet
+resource "aws_subnet" "private" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-1a"
+  tags              = { Name = "PrivateSubnet" }
 }
 
-module "alb" {
-  source                    = "./load-balancer"
-  lb_name                   = "dev-proj-1-alb"
-  is_external               = false
-  lb_type                   = "application"
-  sg_enable_ssh_https       = module.security_group.sg_ec2_sg_ssh_http_id
-  subnet_ids                = tolist(module.networking.dev_proj_1_public_subnets)
-  tag_name                  = "dev-proj-1-alb"
-  lb_target_group_arn       = module.lb_target_group.dev_proj_1_lb_target_group_arn
-  ec2_instance_id           = module.ec2.dev_proj_1_ec2_instance_id
-  lb_listner_port           = 5000
-  lb_listner_protocol       = "HTTP"
-  lb_listner_default_action = "forward"
-  lb_https_listner_port     = 443
-  lb_https_listner_protocol = "HTTPS"
-  dev_proj_1_acm_arn        = module.aws_ceritification_manager.dev_proj_1_acm_arn
-  lb_target_group_attachment_port = 5000
+# Create Internet Gateway
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.main.id
+  tags   = { Name = "InternetGateway" }
 }
 
-module "hosted_zone" {
-  source          = "./hosted-zone"
-  domain_name     = var.domain_name
-  aws_lb_dns_name = module.alb.aws_lb_dns_name
-  aws_lb_zone_id  = module.alb.aws_lb_zone_id
+# Create Public Route Table
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+  tags   = { Name = "PublicRouteTable" }
 }
 
-module "aws_ceritification_manager" {
-  source         = "./certificate-manager"
-  domain_name    = var.domain_name
-  hosted_zone_id = module.hosted_zone.hosted_zone_id
+# Route Internet Traffic through Internet Gateway
+resource "aws_route" "public_internet_access" {
+  route_table_id         = aws_route_table.public.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.gw.id
 }
 
-module "rds_db_instance" {
-  source               = "./rds"
-  db_subnet_group_name = "dev_proj_1_rds_subnet_group"
-  subnet_groups        = tolist(module.networking.dev_proj_1_public_subnets)
-  rds_mysql_sg_id      = module.security_group.rds_mysql_sg_id
-  mysql_db_identifier  = "mydb"
-  mysql_username       = "dbuser"
-  mysql_password       = "dbpassword"
-  mysql_dbname         = "devprojdb"
+# Associate Public Subnet with Public Route Table
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
 }
+
+# Allocate Elastic IP for NAT Gateway
+resource "aws_eip" "nat" {
+  domain = "vpc"
+}
+
+# Create NAT Gateway in Private Subnet
+resource "aws_nat_gateway" "nat" {
+  subnet_id     = aws_subnet.public.id
+  allocation_id = aws_eip.nat.id
+  tags          = { Name = "NATGateway" }
+}
+
+# Create Private Route Table
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+  tags   = { Name = "PrivateRouteTable" }
+}
+
+# Route Private Subnet Internet Traffic through NAT Gateway
+resource "aws_route" "private_nat_access" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = aws_nat_gateway.nat.id
+}
+
+# Associate Private Subnet with Private Route Table
+resource "aws_route_table_association" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
+}
+
+# 🔒 Security Group for Bastion Host (Allow SSH only from 192.168.1.46)
+resource "aws_security_group" "bastion_sg" {
+  vpc_id = aws_vpc.main.id
+  name   = "bastion-sg"
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["192.168.1.0/24"] # Only allow SSH from your IP
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Allocate Elastic IP for Bastion Host
+resource "aws_eip" "bastion_eip" {
+  domain   = "vpc"
+  instance = aws_instance.bastion.id
+  tags     = { Name = "Bastion-EIP" }
+}
+
+# Create Bastion Host (Public EC2 Instance)
+resource "aws_instance" "bastion" {
+  ami                    = "ami-0c7af5fe939f2677f" # Change to a valid AMI ID
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.bastion_sg.id] # 
+  key_name               = "AWS"                              # Change this to your SSH key name
+  tags                   = { Name = "BastionHost" }
+}
+
+# 🔒 Security Group for Private Instance (Only allow SSH from Bastion)
+resource "aws_security_group" "private_sg" {
+  vpc_id = aws_vpc.main.id
+  name   = "private-sg"
+
+  ingress {
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.bastion_sg.id] # Allow only from Bastion
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Create Private Instance
+resource "aws_instance" "private" {
+  ami                    = "ami-0c7af5fe939f2677f" # Change to a valid AMI ID
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.private.id
+  vpc_security_group_ids = [aws_security_group.private_sg.id] # 
+  key_name               = "AWS"                              # Change this to your SSH key name
+  tags                   = { Name = "PrivateInstance" }
+}
+
+
