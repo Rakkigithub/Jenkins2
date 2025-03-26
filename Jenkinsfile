@@ -1,32 +1,79 @@
 pipeline {
     agent any
-    environment {
-        IMAGE = "myapp:latest"
-    }
-    
-    stages {
-        stage('Clone') {
-            steps { git 'https://github.com/Rakkigithub/Jenkins2.git' }
-        }
 
-        stage('Build Docker Image') {
+    parameters {
+            booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
+            booleanParam(name: 'APPLY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
+            booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
+    }
+
+    stages {
+        stage('Clone Repository') {
             steps {
-                sh 'docker build -t myapp:latest .'
+                // Clean workspace before cloning (optional)
+                deleteDir()
+
+                // Clone the Git repository
+                git branch: 'main',
+                    url: ''
+
+                sh "ls -lart"
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Terraform Init') {
+                    steps {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                            sh 'echo "=================Terraform Init=================="'
+                            sh 'terraform init'
+                        }
+                    }
+                }
+        }
+
+        stage('Terraform Plan') {
             steps {
-                withDockerRegistry([credentialsId: 'docker-hub-cred', url: '']) {
-                    sh 'docker tag myapp:latest user/myapp:latest'
-                    sh 'docker push user/myapp:latest'
+                script {
+                    if (params.PLAN_TERRAFORM) {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                                sh 'echo "=================Terraform Plan=================="'
+                                sh 'terraform plan'
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        stage('Deploy') {
+        stage('Terraform Apply') {
             steps {
-                sh 'docker run -d -p 80:80 user/myapp:latest'
+                script {
+                    if (params.APPLY_TERRAFORM) {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                                sh 'echo "=================Terraform Apply=================="'
+                                sh 'terraform apply -auto-approve'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Destroy') {
+            steps {
+                script {
+                    if (params.DESTROY_TERRAFORM) {
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                            dir('infra') {
+                                sh 'echo "=================Terraform Destroy=================="'
+                                sh 'terraform destroy -auto-approve'
+                            }
+                        }
+                    }
+                }
             }
         }
     }
