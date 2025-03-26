@@ -13,7 +13,7 @@ pipeline {
             steps {
                 deleteDir()
                 git branch: 'main',
-                    url: 'https://github.com/Rakkigithub/Jenkins2.git'   // 
+                    url: 'https://github.com/Rakkigithub/Jenkins2.git'   // ✅ Your GitHub repo
                 sh "ls -lart"
             }
         }
@@ -27,10 +27,8 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Init=================="'
-                        sh 'terraform init'
-                    }
+                    sh 'echo "=================Terraform Init=================="'
+                    sh 'terraform init'  // ✅ Running from root
                 }
             }
         }
@@ -41,10 +39,8 @@ pipeline {
             }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Plan=================="'
-                        sh 'terraform plan'
-                    }
+                    sh 'echo "=================Terraform Plan=================="'
+                    sh 'terraform plan'  // ✅ Running from root
                 }
             }
         }
@@ -55,10 +51,8 @@ pipeline {
             }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Apply=================="'
-                        sh 'terraform apply -auto-approve'
-                    }
+                    sh 'echo "=================Terraform Apply=================="'
+                    sh 'terraform apply -auto-approve'  // ✅ Running from root
                 }
             }
         }
@@ -69,10 +63,8 @@ pipeline {
             }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Destroy=================="'
-                        sh 'terraform destroy -auto-approve'
-                    }
+                    sh 'echo "=================Terraform Destroy=================="'
+                    sh 'terraform destroy -auto-approve'  // ✅ Running from root
                 }
             }
         }
