@@ -13,7 +13,7 @@ pipeline {
             steps {
                 deleteDir()
                 git branch: 'main',
-                    url: 'https://github.com/Rakkigithub/Jenkins2.git'   // ✅ Your GitHub repo
+                    url: 'https://github.com/rahulwagh/devops-project-1.git'
                 sh "ls -lart"
             }
         }
@@ -26,9 +26,11 @@ pipeline {
 
         stage('Terraform Init') {
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'echo "=================Terraform Init=================="'
-                    sh 'terraform init'  // ✅ Running from root
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
+                    dir('infra') {
+                        sh 'echo "=================Terraform Init=================="'
+                        sh 'terraform init'
+                    }
                 }
             }
         }
@@ -38,9 +40,11 @@ pipeline {
                 expression { params.PLAN_TERRAFORM }
             }
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'echo "=================Terraform Plan=================="'
-                    sh 'terraform plan'  // ✅ Running from root
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
+                    dir('infra') {
+                        sh 'echo "=================Terraform Plan=================="'
+                        sh 'terraform plan'
+                    }
                 }
             }
         }
@@ -50,9 +54,11 @@ pipeline {
                 expression { params.APPLY_TERRAFORM }
             }
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'echo "=================Terraform Apply=================="'
-                    sh 'terraform apply -auto-approve'  // ✅ Running from root
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
+                    dir('infra') {
+                        sh 'echo "=================Terraform Apply=================="'
+                        sh 'terraform apply -auto-approve'
+                    }
                 }
             }
         }
@@ -62,9 +68,11 @@ pipeline {
                 expression { params.DESTROY_TERRAFORM }
             }
             steps {
-                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'echo "=================Terraform Destroy=================="'
-                    sh 'terraform destroy -auto-approve'  // ✅ Running from root
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rwagh']]) {
+                    dir('infra') {
+                        sh 'echo "=================Terraform Destroy=================="'
+                        sh 'terraform destroy -auto-approve'
+                    }
                 }
             }
         }
