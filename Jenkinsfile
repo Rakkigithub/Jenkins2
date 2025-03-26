@@ -1,5 +1,5 @@
 pipeline {
-    agent any  // ✅ Use 'any' instead of 'docker'
+    agent any  
 
     parameters {
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
@@ -8,7 +8,7 @@ pipeline {
     }
 
     environment {
-        TERRAFORM_BIN = '/usr/bin/terraform'  // ✅ Specify Terraform path
+        TERRAFORM_BIN = '/usr/local/bin/terraform'  // ✅ Use the variable consistently
     }
 
     stages {
@@ -22,11 +22,10 @@ pipeline {
                         wget -q -O terraform.zip https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
                         unzip terraform.zip
                         sudo mv terraform /usr/local/bin/
-                        terraform version
+                        rm -f terraform.zip
                         '''
-                    } else {
-                        sh 'terraform version'
                     }
+                    sh '$TERRAFORM_BIN version'
                 }
             }
         }
@@ -42,7 +41,7 @@ pipeline {
         stage('Terraform Init') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform init -input=false main.tf'
+                    sh '$TERRAFORM_BIN init -input=false'
                 }
             }
         }
@@ -51,7 +50,7 @@ pipeline {
             when { expression { params.PLAN_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform plan -input=false -out=tfplan main.tf'
+                    sh '$TERRAFORM_BIN plan -input=false -out=tfplan'
                 }
             }
         }
@@ -60,7 +59,7 @@ pipeline {
             when { expression { params.APPLY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform apply -auto-approve tfplan'
+                    sh '$TERRAFORM_BIN apply -auto-approve tfplan'
                 }
             }
         }
@@ -69,7 +68,7 @@ pipeline {
             when { expression { params.DESTROY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform destroy -auto-approve main.tf'
+                    sh '$TERRAFORM_BIN destroy -auto-approve'
                 }
             }
         }
