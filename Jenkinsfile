@@ -1,5 +1,9 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'hashicorp/terraform:1.6.0'  // ✅ Run Terraform inside Docker
+        }
+    }
 
     parameters {
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
@@ -7,72 +11,66 @@ pipeline {
         booleanParam(name: 'DESTROY_TERRAFORM', defaultValue: false, description: 'Check to destroy Terraform resources')
     }
 
-    stages {
+    environment {
+        AWS_REGION = 'us-east-1'  // ✅ Add your AWS region
+    }
 
+    stages {
         stage('Clone Repository') {
             steps {
                 deleteDir()
-                git branch: 'main',
-                    url: 'https://github.com/Rakkigithub/Jenkins2.git'   // ✅ Your GitHub repo
+                git branch: 'main', url: 'https://github.com/Rakkigithub/Jenkins2.git'
                 sh "ls -lart"
-            }
-        }
-
-        stage('Check Terraform Version') {
-            steps {
-                sh 'terraform version'
             }
         }
 
         stage('Terraform Init') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Init=================="'
-                        sh 'terraform init'
-                    }
+                    sh '''
+                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                    terraform init -input=false
+                    '''
                 }
             }
         }
 
         stage('Terraform Plan') {
-            when {
-                expression { params.PLAN_TERRAFORM }
-            }
+            when { expression { params.PLAN_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Plan=================="'
-                        sh 'terraform plan'
-                    }
+                    sh '''
+                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                    terraform plan -input=false -out=tfplan
+                    '''
                 }
             }
         }
 
         stage('Terraform Apply') {
-            when {
-                expression { params.APPLY_TERRAFORM }
-            }
+            when { expression { params.APPLY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Apply=================="'
-                        sh 'terraform apply -auto-approve'
-                    }
+                    sh '''
+                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                    terraform apply -auto-approve tfplan
+                    '''
                 }
             }
         }
 
         stage('Terraform Destroy') {
-            when {
-                expression { params.DESTROY_TERRAFORM }
-            }
+            when { expression { params.DESTROY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    dir('infra') {
-                        sh 'echo "=================Terraform Destroy=================="'
-                        sh 'terraform destroy -auto-approve'
-                    }
+                    sh '''
+                    export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+                    export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+                    terraform destroy -auto-approve
+                    '''
                 }
             }
         }
