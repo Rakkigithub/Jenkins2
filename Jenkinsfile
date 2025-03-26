@@ -1,6 +1,10 @@
 pipeline {
-    agent any
-    
+    agent {
+        docker {
+            image 'hashicorp/terraform:1.6.0'  // ✅ Run Terraform commands in Docker
+        }
+    }
+
     parameters {
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
         booleanParam(name: 'APPLY_TERRAFORM', defaultValue: false, description: 'Check to apply Terraform changes')
@@ -11,15 +15,14 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 deleteDir()
-                git branch: 'main',
-                    url: 'https://github.com/Rakkigithub/Jenkins2.git'
+                git branch: 'main', url: 'https://github.com/Rakkigithub/Jenkins2.git'
                 sh "ls -lart"
             }
         }
 
-        stage('Terraform Version') {
+        stage('Check Terraform Version') {
             steps {
-                sh 'terraform version'  // ✅ Verify Terraform version
+                sh 'terraform version'  // ✅ Terraform will be available from Docker image
             }
         }
 
