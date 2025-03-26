@@ -1,9 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'hashicorp/terraform:1.6.0'  // ✅ Run Terraform commands in Docker
-        }
-    }
+    agent any
 
     parameters {
         booleanParam(name: 'PLAN_TERRAFORM', defaultValue: false, description: 'Check to plan Terraform changes')
@@ -22,14 +18,21 @@ pipeline {
 
         stage('Check Terraform Version') {
             steps {
-                sh 'terraform version'  // ✅ Terraform will be available from Docker image
+                sh 'docker run --rm hashicorp/terraform:1.6.0 version'  // ✅ Run Terraform in Docker
             }
         }
 
         stage('Terraform Init') {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform init -input=false'
+                    sh '''
+                    docker run --rm \
+                    -v $PWD:/workspace \
+                    -w /workspace \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    hashicorp/terraform:1.6.0 init -input=false
+                    '''
                 }
             }
         }
@@ -38,7 +41,14 @@ pipeline {
             when { expression { params.PLAN_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform plan -input=false -out=tfplan main.tf'
+                    sh '''
+                    docker run --rm \
+                    -v $PWD:/workspace \
+                    -w /workspace \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    hashicorp/terraform:1.6.0 plan -input=false -out=tfplan main.tf
+                    '''
                 }
             }
         }
@@ -47,7 +57,14 @@ pipeline {
             when { expression { params.APPLY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform apply -auto-approve tfplan'
+                    sh '''
+                    docker run --rm \
+                    -v $PWD:/workspace \
+                    -w /workspace \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    hashicorp/terraform:1.6.0 apply -auto-approve tfplan
+                    '''
                 }
             }
         }
@@ -56,7 +73,14 @@ pipeline {
             when { expression { params.DESTROY_TERRAFORM } }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials-rakki']]) {
-                    sh 'terraform destroy -auto-approve main.tf'
+                    sh '''
+                    docker run --rm \
+                    -v $PWD:/workspace \
+                    -w /workspace \
+                    -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                    -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                    hashicorp/terraform:1.6.0 destroy -auto-approve main.tf
+                    '''
                 }
             }
         }
