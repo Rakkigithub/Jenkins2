@@ -15,7 +15,7 @@ pipeline {
 
                 // Clone the Git repository
                 git branch: 'main',
-                    url: ''
+                    url: 'https://github.com/Rakkigithub/Jenkins2.git'
 
                 sh "ls -lart"
             }
@@ -36,7 +36,7 @@ pipeline {
             steps {
                 script {
                     if (params.PLAN_TERRAFORM) {
-                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rakki']]){
                             dir('infra') {
                                 sh 'echo "=================Terraform Plan=================="'
                                 sh 'terraform plan'
@@ -51,7 +51,7 @@ pipeline {
             steps {
                 script {
                     if (params.APPLY_TERRAFORM) {
-                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rakki']]){
                             dir('infra') {
                                 sh 'echo "=================Terraform Apply=================="'
                                 sh 'terraform apply -auto-approve'
@@ -66,7 +66,7 @@ pipeline {
             steps {
                 script {
                     if (params.DESTROY_TERRAFORM) {
-                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rwagh']]){
+                       withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-crendentails-rakki']]){
                             dir('infra') {
                                 sh 'echo "=================Terraform Destroy=================="'
                                 sh 'terraform destroy -auto-approve'
