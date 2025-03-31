@@ -1,49 +1,32 @@
 pipeline {
-    agent any
-
-    environment {
-        AWS_DEFAULT_REGION = 'us-east-1'         // Set your AWS region
-        AWS_CREDENTIALS_ID = 'aws-credentials-rakki'  // Your AWS credentials ID
+  agent {
+    docker { image 'jenkins/jenkins:lts' }
+  }
+  environment {
+    DOCKER_IMAGE = 'my-app:latest'
+    DOCKER_CONTAINER = 'my-app-container'
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
-
-    stages {
-        stage('Clone Repository') {
-            steps {
-                git branch: 'main', url: 'https://github.com/Rakkigithub/Jenkins2.git'
-            }
-        }
-
-        stage('Terraform Init') {
-            steps {
-                withAWS(credentials: "${AWS_CREDENTIALS_ID}") {
-                    sh 'terraform init'
-                }
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                withAWS(credentials: "${AWS_CREDENTIALS_ID}") {
-                    sh 'terraform plan'
-                }
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                withAWS(credentials: "${AWS_CREDENTIALS_ID}") {
-                    sh 'terraform apply -auto-approve'
-                }
-            }
-        }
+    stage('Build Docker Image') {
+      steps {
+        sh 'docker build -t $DOCKER_IMAGE .'
+      }
     }
-
-    post {
-        success {
-            echo "Terraform deployment successful!"
-        }
-        failure {
-            echo "Terraform deployment failed!"
-        }
+    stage('Run Docker Container') {
+      steps {
+        sh 'docker run -d --name $DOCKER_CONTAINER $DOCKER_IMAGE'
+      }
     }
+    stage('Cleanup') {
+      steps {
+        sh 'docker stop $DOCKER_CONTAINER || true'
+        sh 'docker rm $DOCKER_CONTAINER || true'
+      }
+    }
+  }
 }
