@@ -1,32 +1,36 @@
 pipeline {
-  agent {
-    docker { image 'jenkins/jenkins:lts' }
-  }
-  environment {
-    DOCKER_IMAGE = 'my-app:latest'
-    DOCKER_CONTAINER = 'my-app-container'
-  }
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
-      }
+    agent any
+    environment {
+        IMAGE_NAME = 'my-website'
+        CONTAINER_NAME = 'my-website-container'
+        PORT = '80'
     }
-    stage('Build Docker Image') {
-      steps {
-        sh 'docker build -t $DOCKER_IMAGE .'
-      }
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t $IMAGE_NAME .'
+                }
+            }
+        }
+        stage('Stop Old Container') {
+            steps {
+                script {
+                    sh 'docker rm -f $CONTAINER_NAME || true'
+                }
+            }
+        }
+        stage('Run New Container') {
+            steps {
+                script {
+                    sh 'docker run -d --name $CONTAINER_NAME -p $PORT:80 $IMAGE_NAME'
+                }
+            }
+        }
     }
-    stage('Run Docker Container') {
-      steps {
-        sh 'docker run -d --name $DOCKER_CONTAINER $DOCKER_IMAGE'
-      }
-    }
-    stage('Cleanup') {
-      steps {
-        sh 'docker stop $DOCKER_CONTAINER || true'
-        sh 'docker rm $DOCKER_CONTAINER || true'
-      }
-    }
-  }
 }
