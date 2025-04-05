@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'nginx:latest' // Change this to your image
-        CONTAINER_NAME = 'my-nginx'
+        IMAGE_NAME = 'jenkins:jenkins/lts' // Change this to your image
+        CONTAINER_NAME = 'jenkins'
     }
 
     stages {
