@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        IMAGE_NAME = 'my-website'
+        IMAGE_NAME = 'nginx'
         CONTAINER_NAME = 'my-website-container'
         PORT = '80'
     }
