@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'jenkins:jenkins/lts' // Change this to your image
+        IMAGE_NAME = 'jenkins/jenkins:lts' // Change this to your image
         CONTAINER_NAME = 'jenkins'
     }
 
