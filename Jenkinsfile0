@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'jenkins/jenkins:lts'
-        CONTAINER_NAME = 'jenkins'
+        CONTAINER_NAME = 'jenkins45'
         VOLUME_NAME = 'jenkins_home'
     }
 
